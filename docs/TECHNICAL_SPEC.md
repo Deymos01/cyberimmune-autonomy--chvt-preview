@@ -23,6 +23,7 @@
     "sender_id": "sender_01",
     "route_id": "route_001"
 }
+```
 
 ## Цепочка обработки
 
