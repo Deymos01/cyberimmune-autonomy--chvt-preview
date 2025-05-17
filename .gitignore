@@ -9,3 +9,5 @@ tests/e2e/*.wpl
 cyberimmunity--autonomous-car*.pdf
 out
 .venv
+.idea
+cyberimmunki
