@@ -1,19 +1,18 @@
 from abc import ABC, abstractmethod
 from multiprocessing import Process
 from queue import Empty, Queue
-from event_types import ControlEvent
-from queues_dir import QueuesDirectory
+from src.event_types import ControlEvent
+from src.queues_dir import QueuesDirectory
 from time import sleep
-from config import DEFAULT_LOG_LEVEL, LOG_INFO, CRITICALITY_STR, LOG_ERROR
+from src.config import DEFAULT_LOG_LEVEL, LOG_INFO, CRITICALITY_STR, LOG_ERROR
+from src.config import ACCESS_CONTROL_QUEUE_NAME
 
 
-# ===============================================================
-# Базовый класс для блоков контроля доступа
-# ===============================================================
+
 class BaseAccessControlBlock(Process, ABC):
     """ Базовый класс для реализации контроля доступа """
     log_prefix = "[BASE ACCESS]"
-    event_source_name = "access_control_base_queue"
+    event_source_name = ACCESS_CONTROL_QUEUE_NAME
     events_q_name = event_source_name
 
     def __init__(self, queues_dir: QueuesDirectory, log_level=DEFAULT_LOG_LEVEL):

@@ -2,15 +2,15 @@
 """
 from time import sleep
 from queue import Empty
-from typing import Optional, List
+from typing import Optional
 from multiprocessing import Queue, Process
-from geopy import Point
 
 from src.config import CRITICALITY_STR, LOG_DEBUG, \
-    LOG_ERROR, LOG_INFO, PLANNER_QUEUE_NAME, DEFAULT_LOG_LEVEL, MISSION_SENDER_QUEUE_NAME
+    LOG_ERROR, LOG_INFO, PLANNER_QUEUE_NAME, DEFAULT_LOG_LEVEL, MISSION_SENDER_QUEUE_NAME, ACCESS_CONTROL_QUEUE_NAME
 from src.queues_dir import QueuesDirectory
 from src.event_types import Event, ControlEvent
 from src.mission_type import Mission
+from abc import abstractmethod
 
 
 class MissionPlanner(Process):
@@ -23,7 +23,7 @@ class MissionPlanner(Process):
     log_level = DEFAULT_LOG_LEVEL
 
     def __init__(
-            self, queues_dir: QueuesDirectory, afcs_present: bool = False, mission: Mission = None):
+            self, queues_dir: QueuesDirectory, afcs_present: bool = False, sender_id: str = None, route_id: str = None):
         # вызываем конструктор базового класса
         super().__init__()
 
@@ -48,9 +48,9 @@ class MissionPlanner(Process):
         # маршрут для движения
         self._mission: Optional[Mission] = None
 
-        if mission is not None:
+        if sender_id is not None and route_id is not None:
             # устанавливаем правильным образом
-            self.set_new_mission(mission)
+            self.set_new_mission(sender_id, route_id)
 
         self._log_message(LOG_INFO, "создана система планирования заданий")
 
@@ -71,33 +71,20 @@ class MissionPlanner(Process):
     def _status_update(self, telemetry):
         self._log_message(LOG_INFO, f"получен новый статус: {telemetry}")
 
-    def set_new_mission(
-            self, mission: Mission = None, home: Point = None,
-            waypoints: Optional[List] = None,
-            speed_limits: Optional[List] = None,
-            arm: bool = False):
-        """set_new_mission установка нового маршрутного задания
 
-        Args:
-            mission (Mission): полное описание маршрутного задания
-
-            альтернативный способ задания:
-
-            home (Point): стартовая точка
-            waypoints (List[Point]): путевые точки
-            speed_limits (List[): скоростные ограничения
-
-            arm (bool, optional): разрешение на выезд. Defaults to False.
-        """
-        if mission is None:
-            mission = Mission(home=home, waypoints=waypoints,
-                              speed_limits=speed_limits, armed=arm)
-
-        event = Event(source=MissionPlanner.event_source_name,
-                      destination=MissionPlanner.event_q_name, operation="set_mission",
-                      parameters=mission)
+    def set_new_mission(self, sender_id: str, route_id: str):
+        """Новый метод для инициирования запроса миссии"""
+        event = Event(
+            source=self.event_source_name,
+            destination=ACCESS_CONTROL_QUEUE_NAME,  # Очередь AccessControlBlock
+            operation="take_mission",
+            parameters={
+                "sender_id": sender_id,
+                "route_id": route_id
+            }
+        )
         self._events_q.put(event)
-        self._log_message(LOG_DEBUG, f"запрошена новая задача: {mission}")
+        self._log_message(LOG_DEBUG, f"Запрошена проверка миссии: {sender_id}:{route_id}")
 
     def _set_mission(self, mission: Mission):
         self._mission = mission
@@ -154,19 +141,36 @@ class MissionPlanner(Process):
             pass
 
     def _check_events_q(self):
+        """Обработка входящих событий"""
         try:
             event: Event = self._events_q.get_nowait()
             if not isinstance(event, Event):
                 return
+
+            self._log_message(LOG_DEBUG, f"Получено событие: {event.operation}")
+
             if event.operation == 'set_mission':
-                try:
-                    self._set_mission(event.parameters)
-                except Exception as e:
-                    self._log_message(
-                        LOG_ERROR, f"ошибка отправки координат: {e}")
+                # Обработка миссии от ResourceManager
+                self._set_mission(event.parameters)
+
+            elif event.operation == 'mission_rejected':
+                # Обработка отказа в миссии
+                self._handle_mission_rejection(event.parameters)
+
         except Empty:
-            # никаких команд не поступило, ну и ладно
             pass
+        except Exception as e:
+            self._log_message(LOG_ERROR, f"Ошибка обработки события: {str(e)}")
+
+
+    def _handle_mission_rejection(self, parameters: dict):
+        """Обработка отказа в выполнении миссии"""
+        reason = parameters.get('reason', 'неизвестная причина')
+        sender_id = parameters.get('sender_id', 'unknown')
+        route_id = parameters.get('route_id', 'unknown')
+
+        self._log_message(LOG_INFO,
+                          f"Миссия отклонена: {sender_id}:{route_id}. Причина: {reason}")
 
     def stop(self):
         """ запрос на остановку работы """
