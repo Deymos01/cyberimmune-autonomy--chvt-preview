@@ -11,6 +11,7 @@ from src.queues_dir import QueuesDirectory
 from src.event_types import Event, ControlEvent
 from src.mission_type import Mission
 from abc import abstractmethod
+from src.config import SAFETY_BLOCK_QUEUE_NAME
 
 
 class MissionPlanner(Process):
@@ -48,11 +49,13 @@ class MissionPlanner(Process):
         # маршрут для движения
         self._mission: Optional[Mission] = None
 
+        print(sender_id, route_id)
         if sender_id is not None and route_id is not None:
             # устанавливаем правильным образом
+            print("перед вызовом метода set_new_mission")
             self.set_new_mission(sender_id, route_id)
-
-        self._log_message(LOG_INFO, "создана система планирования заданий")
+        
+        self._log_message(LOG_INFO, "создана система планирования")
 
     def _log_message(self, criticality: int, message: str):
         """_log_message печатает сообщение заданного уровня критичности
@@ -74,17 +77,30 @@ class MissionPlanner(Process):
 
     def set_new_mission(self, sender_id: str, route_id: str):
         """Новый метод для инициирования запроса миссии"""
+        
+        access_control_q = self._queues_dir.get_queue(ACCESS_CONTROL_QUEUE_NAME)
         event = Event(
             source=self.event_source_name,
-            destination=ACCESS_CONTROL_QUEUE_NAME,  # Очередь AccessControlBlock
+            destination=ACCESS_CONTROL_QUEUE_NAME,
             operation="take_mission",
             parameters={
                 "sender_id": sender_id,
                 "route_id": route_id
             }
         )
-        self._events_q.put(event)
-        self._log_message(LOG_DEBUG, f"Запрошена проверка миссии: {sender_id}:{route_id}")
+
+        # safety_event = Event(
+        #     source=self.event_source_name,
+        #     destination=SAFETY_BLOCK_QUEUE_NAME,
+        #     operation="position_update",
+        #     parameters={
+        #         "sender_id": sender_id,
+        #         "route_id": route_id
+        #     }
+        # )
+
+        access_control_q.put(event)
+        self._log_message(LOG_INFO, f"Запрошена проверка миссии: {sender_id}:{route_id}")
 
     def _set_mission(self, mission: Mission):
         self._mission = mission

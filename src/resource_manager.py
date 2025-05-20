@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from multiprocessing import Process
 from src.config import RESOURCE_MANAGER_QUEUE_NAME
-from queue import Empty, Queue
+from multiprocessing import Queue
+from queue import Empty
 from src.event_types import ControlEvent
 from src.queues_dir import QueuesDirectory
 from time import sleep
@@ -20,6 +21,7 @@ class BaseResourceManager(Process, ABC):
 
         # Инициализация очередей
         self._events_q = Queue()
+        print(self._events_q)
         self._control_q = Queue()
         self._quit = False
         self._recalc_interval_sec = 0.1
@@ -61,7 +63,7 @@ class BaseResourceManager(Process, ABC):
 
                 try:
                     event = self._events_q.get_nowait()
-
+                    self._log_message(LOG_INFO, f"после self._events_q.get_nowait")
                     # Проверка наличия обязательных параметров
                     if 'sender_id' not in event.parameters or 'route_id' not in event.parameters:
                         raise KeyError("Отсутствуют обязательные параметры sender_id или route_id")

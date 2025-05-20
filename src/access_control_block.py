@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from multiprocessing import Process
-from queue import Empty, Queue
+from multiprocessing import Queue
+from queue import Empty
 from src.event_types import ControlEvent
 from src.queues_dir import QueuesDirectory
 from time import sleep
@@ -58,6 +59,7 @@ class BaseAccessControlBlock(Process, ABC):
                 while True:
                     event = self._events_q.get_nowait()
                     params = event.parameters
+                    self._log_message(LOG_INFO, f"перед вызовом self._process_access_request, sender_id: {params.get('sender_id')}, route_id: {params.get('route_id')}")
                     self._process_access_request(
                         params.get('sender_id'),
                         params.get('route_id')
