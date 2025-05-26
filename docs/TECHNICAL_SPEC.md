@@ -80,8 +80,8 @@ allowed_mapping = {
 Метод `_process_access_request(sender_id, route_id)` должен:
 
 - Получать список разрешённых маршрутов для данного отправителя.
-- Вызывать метод _forward_to_resource_manager(sender_it, route_id), если `route_id` присутствует в списке.
-- Вызывать метод _send_rejection(sender_it, route_id), если запрос не авторизован.
+- Вызывать метод `_forward_to_resource_manager(sender_it, route_id)`, если `route_id` присутствует в списке.
+- Вызывать метод `_send_rejection(sender_it, route_id)`, если запрос не авторизован.
 
 #### Логирование
 
